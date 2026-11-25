@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Malakai Movies">
+<meta name="theme-color" content="#0e1014">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>Malakai Movies</title>
+<style>
+  :root {
+    --bg: #0e1014; --panel: #181b22; --panel2: #242835; --text: #f2f3f5;
+    --muted: #9aa1ad; --accent: #ffc83d; --danger: #ff6b5e; --ok: #4cd07d; --radius: 14px;
+    --card: 150px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+  body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  body.playing { overflow: hidden; }
+  body.big { --card: 230px; }
+  body.locked .unlocked-only { display: none !important; }
+  button, select { font: inherit; color: inherit; border: 0; cursor: pointer; }
+  [hidden] { display: none !important; }
+
+  header { display: flex; align-items: center; gap: 12px; padding: 20px 24px 8px; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: 32px; letter-spacing: -0.5px; flex: 1; min-width: 200px;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; display: flex; align-items: center; gap: 10px; }
+  h1 img { width: 40px; height: 40px; }
+  #lockIcon { font-size: 18px; color: var(--muted); }
+  .tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  #search, #sortSel { background: var(--panel); border: 1px solid #2c313d; color: var(--text); border-radius: 12px;
+    padding: 10px 12px; font-size: 16px; outline: none; }
+  #search { width: 190px; }
+  #sortSel { -webkit-appearance: none; appearance: none; padding-right: 30px;
+    background-image: linear-gradient(45deg, transparent 50%, #9aa1ad 50%), linear-gradient(135deg, #9aa1ad 50%, transparent 50%);
+    background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
+  .btn { background: var(--panel2); padding: 10px 16px; border-radius: 12px; font-weight: 600; }
+  .btn.primary { background: var(--accent); color: #1a1400; }
+  .btn.danger { background: #3a1d1b; color: #ffb0a8; }
+  .btn:disabled { opacity: .4; }
+  .icon-btn { width: 44px; height: 44px; border-radius: 22px; background: var(--panel2); font-size: 20px; line-height: 44px; text-align: center; padding: 0; }
+  .icon-btn.primary { background: var(--accent); color: #1a1400; font-size: 28px; font-weight: 500; }
+
+  #banners { padding: 0 24px; }
+  .banner { background: var(--panel); border-left: 4px solid var(--accent); border-radius: 10px;
+    padding: 12px 16px; margin: 10px 0; color: #dfe2e7; display: flex; gap: 12px; align-items: center; }
+  .banner span { flex: 1; }
+  main { padding: 4px 24px 40px; }
+  h2 { font-size: 20px; margin: 22px 0 12px; }
+  body.big h2 { font-size: 24px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--card), 1fr)); gap: 22px 18px; }
+  .row { display: flex; gap: 18px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; }
+  .row .card { width: var(--card); flex: 0 0 auto; }
+  .card { position: relative; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+  .card img { -webkit-user-drag: none; pointer-events: none; }
+  .poster { position: relative; aspect-ratio: 2 / 3; border-radius: var(--radius); overflow: hidden;
+    background: var(--panel); box-shadow: 0 6px 18px rgba(0,0,0,.35); transition: transform .15s; }
+  .card.pressing .poster { transform: scale(.95); }
+  .poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ph { position: absolute; inset: 0; display: flex; align-items: flex-end; padding: 14px;
+    font-weight: 800; font-size: 19px; line-height: 1.15; text-shadow: 0 2px 8px rgba(0,0,0,.4); }
+  .card.missing .poster { opacity: .38; }
+  .prog { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: rgba(0,0,0,.55); }
+  .prog div { height: 100%; background: var(--accent); }
+  .badges { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; gap: 5px; flex-wrap: wrap; }
+  .badge { background: rgba(0,0,0,.7); font-size: 11px; font-weight: 700; padding: 3px 6px; border-radius: 6px; }
+  .badge.watched { background: var(--ok); color: #062611; margin-left: auto; }
+  body.big .badges .badge:not(.watched) { display: none; }
+  .ctitle { margin-top: 8px; font-weight: 600; font-size: 15px; }
+  body.big .ctitle { font-size: 19px; }
+  .cyear { color: var(--muted); font-size: 13px; }
+  body.big .cyear { display: none; }
+  #empty { color: var(--muted); padding: 40px 0; max-width: 540px; }
+  footer { color: var(--muted); font-size: 13px; padding: 0 24px 30px; }
+
+  .sheet { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center;
+    justify-content: center; z-index: 20; padding: 20px; }
+  .panel { background: var(--panel); border-radius: 18px; padding: 22px; width: 100%; max-width: 500px;
+    max-height: 90vh; overflow: auto; }
+  .panel h3 { margin: 0 0 12px; font-size: 21px; }
+  .panel p, .panel li { color: #cfd3da; }
+  .panel ul { padding-left: 20px; margin: 8px 0; }
+  .panel label.check { display: flex; gap: 10px; align-items: flex-start; margin: 14px 0; }
+  .panel label.check input { width: 22px; height: 22px; margin-top: 1px; accent-color: var(--accent); flex: 0 0 auto; }
+  .small { font-size: 13px; color: var(--muted); }
+  .btns { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+  .field { display: block; margin: 10px 0; }
+  .field span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  .field input { width: 100%; background: var(--panel2); border: 1px solid #343a48; border-radius: 10px;
+    padding: 10px 12px; color: var(--text); font-size: 16px; }
+  .menu { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+  .menu button { text-align: left; background: transparent; padding: 13px 10px; border-radius: 10px; font-size: 17px; }
+  .menu button:active { background: var(--panel2); }
+  .menu button.danger { color: var(--danger); }
+  .mhead { display: flex; gap: 14px; align-items: center; }
+  .mhead .poster { width: 64px; flex: 0 0 auto; border-radius: 8px; }
+  .mhead .ph { font-size: 10px; padding: 6px; }
+  .mhead b { font-size: 19px; display: block; }
+  .results { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; margin-top: 12px; }
+  .results button { background: transparent; padding: 0; text-align: left; }
+  .results img { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 8px; background: var(--panel2); display: block; }
+  .results span { font-size: 12px; color: var(--muted); display: block; margin-top: 4px; }
+
+  #orderList { display: flex; flex-direction: column; gap: 8px; }
+  .orow { display: flex; align-items: center; gap: 12px; background: var(--panel); border-radius: 12px; padding: 8px 10px; }
+  .orow.dragging { background: var(--panel2); box-shadow: 0 8px 24px rgba(0,0,0,.5); position: relative; z-index: 2; }
+  .orow .poster { width: 40px; border-radius: 6px; }
+  .orow .ph { font-size: 7px; padding: 3px; }
+  .orow .t { flex: 1; font-weight: 600; }
+  .handle { width: 48px; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 24px;
+    color: var(--muted); touch-action: none; -webkit-user-select: none; user-select: none; }
+
+  #player { position: fixed; inset: 0; background: #000; z-index: 30; display: flex; flex-direction: column; }
+  .ptop { display: flex; align-items: center; gap: 12px; padding: calc(10px + env(safe-area-inset-top)) 16px 10px; background: #000; }
+  #ptitle { flex: 1; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #video { flex: 1; width: 100%; min-height: 0; background: #000; }
+  #subToggle.on { background: var(--accent); color: #1a1400; }
+
+  #toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom));
+    background: #232836; border-radius: 14px; padding: 12px 16px; z-index: 40; width: min(540px, 92vw);
+    box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+  #toast .trow { display: flex; gap: 12px; align-items: center; }
+  #toastText { flex: 1; }
+  #toast .bar { height: 5px; background: #3a4050; border-radius: 3px; margin-top: 8px; overflow: hidden; }
+  #toastBar { height: 100%; width: 0; background: var(--accent); }
+  @media (max-width: 640px) { #search { width: 130px; } h1 { font-size: 26px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="appTitle"><img src="icon-192.png" alt="">Malakai Movies <span id="lockIcon" hidden>🔒</span></h1>
+  <div class="tools">
+    <input id="search" type="search" placeholder="Search" autocomplete="off">
+    <select id="sortSel" aria-label="Sort">
+      <option value="alpha">A to Z</option>
+      <option value="recent">Recently added</option>
+      <option value="custom">My order</option>
+    </select>
+    <button id="editOrderBtn" class="btn unlocked-only" hidden>Edit order</button>
+    <button id="settingsBtn" class="icon-btn unlocked-only" aria-label="Settings">⚙︎</button>
+    <button id="addBtn" class="icon-btn primary unlocked-only" aria-label="Add movies">+</button>
+  </div>
+</header>
+<div id="banners"></div>
+<main>
+  <section id="continueSec" hidden>
+    <h2>Continue watching</h2>
+    <div id="continueRow" class="row"></div>
+  </section>
+  <section>
+    <h2 id="allTitle">All movies</h2>
+    <div id="grid" class="grid"></div>
+    <div id="empty" hidden>
+      No movies yet. Tap <b>+</b>, then <b>From Files</b>. Tap <b>Select</b>, choose the
+      .mp4 files with their .srt subtitles, and tap <b>Open</b>.<br><br>
+      Press and hold any movie for options.
+    </div>
+  </section>
+</main>
+<footer id="storage"></footer>
+
+<input type="file" id="picker" multiple hidden accept=".mp4,.m4v,.mov,.srt,.vtt,.jpg,.jpeg,.png,.webp,.heic">
+<input type="file" id="posterPicker" hidden accept="image/*">
+<input type="file" id="subPicker" hidden accept=".srt,.vtt">
+
+<!-- + menu -->
+<div id="addSheet" class="sheet" hidden>
+  <div class="panel">
+    <h3>Add movies</h3>
+    <div class="menu">
+      <button id="addFiles">📁  From Files</button>
+      <button id="addLink">🔗  From a link</button>
+    </div>
+    <div class="btns"><button class="btn" data-close>Cancel</button></div>
+  </div>
+</div>
+
+<!-- link download -->
+<div id="linkSheet" class="sheet" hidden>
+  <div class="panel">
+    <h3>Download from a link</h3>
+    <label class="field"><span>Link</span><input id="linkUrl" type="url" placeholder="https://…" autocapitalize="off" autocorrect="off"></label>
+    <label class="field"><span>Save as (optional, e.g. Bumblebee.2018.mp4)</span><input id="linkName" autocapitalize="off" autocorrect="off"></label>
+    <p class="small">The movie downloads straight into the app. MP4 links only. Keep the app open until it finishes.</p>
+    <div id="linkFail" hidden>
+      <p id="linkFailText"></p>
+      <p class="small">After Safari finishes the download, add it here with <b>From Files</b>.</p>
+      <a id="linkSafari" class="btn" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none">Open link in Safari</a>
+    </div>
+    <div class="btns">
+      <button class="btn primary" id="linkGo">Download</button>
+      <button class="btn" data-close>Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- import summary -->
+<div id="importSheet" class="sheet" hidden>
+  <div class="panel">
+    <h3>Add to library</h3>
+    <div id="importSummary"></div>
+    <label class="check">
+      <input type="checkbox" id="saveCopies">
+      <span>Save copies inside the app<br>
+        <span class="small">They keep working after the app closes, with no re-picking. After saving, delete the originals in Files so you don't store everything twice.</span></span>
+    </label>
+    <div class="small" id="importSpace"></div>
+    <div class="btns">
+      <button class="btn primary" id="importGo">Add</button>
+      <button class="btn" data-close>Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- long-press menu -->
+<div id="menuSheet" class="sheet" hidden>
+  <div class="panel">
+    <div class="mhead"><div class="poster" id="menuPoster"></div><div><b id="menuTitle"></b><span class="small" id="menuInfo"></span></div></div>
+    <div class="menu">
+      <button data-act="play">▶︎  Play</button>
+      <button data-act="edit">✎  Rename</button>
+      <button data-act="posterMenu">🖼  Poster  ›</button>
+      <button data-act="subsMenu">💬  Subtitles  ›</button>
+      <button data-act="watched">✓  Mark watched</button>
+      <button data-act="copy">⬇︎  Save copy in app</button>
+      <button data-act="delete" class="danger">🗑  Delete</button>
+    </div>
+    <div class="btns"><button class="btn" data-close>Close</button></div>
+  </div>
+</div>
+
+<!-- poster submenu -->
+<div id="posterMenuSheet" class="sheet" hidden>
+  <div class="panel">
+    <h3>Poster</h3>
+    <div class="menu">
+      <button data-act="findPoster">🔍  Find online</button>
+      <button data-act="poster">🖼  Choose image</button>
+      <button data-act="frame">🎞  Use a frame from the movie</button>
+    </div>
+    <div class="btns"><button class="btn" data-back>‹ Back</button></div>
+  </div>
+</div>
+
+<!-- subtitles submenu -->
+<div id="subsMenuSheet" class="sheet" hidden>
+  <div class="panel">
+    <h3>Subtitles</h3>
+    <div class="menu">
+      <button data-act="subs">＋  Add subtitle file</button>
+      <button data-act="subsRemove" class="danger">🗑  Remove subtitles</button>
+    </div>
+    <div class="btns"><button class="btn" data-back>‹ Back</button></div>
+  </div>
+</div>
+
+<!-- edit -->
+<div id="editSheet" class="sheet" hidden>
+  <div class="panel">
+    <h3>Rename</h3>
+    <label class="field"><span>Title</span><input id="editTitle" enterkeyhint="done"></label>
+    <label class="field"><span>Year</span><input id="editYear" inputmode="numeric"></label>
+    <div class="btns"><button class="btn primary" id="editSave">Save</button><button class="btn" data-close>Cancel</button></div>
+  </div>
+</div>
+
+<!-- delete confirm -->
+<div id="deleteSheet" class="sheet" hidden>
+  <div class="panel">
+    <h3 id="deleteTitle"></h3>
+    <p id="deleteText"></p>
+    <div class="btns"><button class="btn danger" id="deleteGo">Delete</button><button class="btn" data-close>Cancel</button></div>
+  </div>
+</div>
+
+<!-- poster search -->
+<div id="posterSheet" class="sheet" hidden>
+  <div class="panel">
+    <h3>Pick a poster</h3>
+    <div style="display:flex;gap:8px"><input id="posterQuery" class="field" style="flex:1;margin:0;background:var(--panel2);border:1px solid #343a48;border-radius:10px;padding:10px 12px;color:var(--text);font-size:16px">
+      <button class="btn" id="posterSearchGo">Search</button></div>
+    <p class="small" id="posterMsg"></p>
+    <div class="results" id="posterResults"></div>
+    <div class="btns"><button class="btn" data-close>Cancel</button></div>
+  </div>
+</div>
+
+<!-- settings -->
+<div id="settingsSheet" class="sheet" hidden>
+  <div class="panel">
+    <h3>Settings</h3>
+    <label class="check"><input type="checkbox" id="bigMode"><span>Big posters<br><span class="small">Larger, simpler cards that are easy for kids to tap.</span></span></label>
+    <label class="field"><span>TMDB key for real posters</span><input id="tmdbKey" autocapitalize="off" autocorrect="off" placeholder="API key or read access token"></label>
+    <p class="small">Free at themoviedb.org: make an account, then Settings › API. The key stays on this iPad only.</p>
+    <div class="btns">
+      <button class="btn" id="allPosters">Find posters for all movies</button>
+      <button class="btn" id="lockNow">Turn on kid lock</button>
+    </div>
+    <p class="small">Kid lock hides adding, deleting, editing and reordering. To unlock, press and hold the title for 3 seconds.</p>
+    <p class="small" id="settingsStorage"></p>
+    <div class="btns"><button class="btn primary" data-close>Done</button></div>
+  </div>
+</div>
+
+<!-- custom order -->
+<div id="orderSheet" class="sheet" hidden>
+  <div class="panel">
+    <h3>Drag to reorder</h3>
+    <div id="orderList"></div>
+    <div class="btns"><button class="btn primary" id="orderDone">Done</button><button class="btn" data-close>Cancel</button></div>
+  </div>
+</div>
+
+<div id="player" hidden>
+  <div class="ptop">
+    <button class="btn" id="closePlayer">Done</button>
+    <span id="ptitle"></span>
+    <button class="btn" id="subToggle">CC</button>
+  </div>
+  <video id="video" controls playsinline preload="metadata"></video>
+</div>
+
+<div id="toast" hidden>
+  <div class="trow"><div id="toastText"></div><button class="btn" id="toastCancel" hidden>Stop</button></div>
+  <div class="bar" id="toastBarWrap"><div id="toastBar"></div></div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (s) => document.querySelector(s);
+  const VIDEO_EXT = ['mp4', 'm4v', 'mov'];
+  const SUB_EXT = ['srt', 'vtt'];
+  const IMG_EXT = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'];
+
+  const state = { movies: [], session: new Map(), posterUrls: new Map() };
+  let DB = null, opfsDir = null, cur = null, lastSave = 0, busy = false, menuMovie = null;
+
+  // ---------- helpers ----------
+  const ls = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch {} }
+  };
+  const ext = (n) => (n.split('.').pop() || '').toLowerCase();
+  const baseOf = (n) => n.replace(/\.[^.]+$/, '');
+  const gb = (b) => (b / 1e9).toFixed(1) + ' GB';
+  const byId = (id) => state.movies.find((m) => m.id === id);
+  const playable = (m) => !!(m.stored || state.session.has(m.id));
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const locked = () => ls.get('locked', '0') === '1';
+
+  function parseTitle(base) {
+    const s = base.replace(/[._]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const m = s.match(/^(.*?)[\s(\[]*((?:19|20)\d{2})(?:[\s)\]].*)?$/);
+    if (m && m[1].trim()) return { title: m[1].replace(/[\s-]+$/, '').trim(), year: m[2] };
+    return { title: s, year: '' };
+  }
+  function grad(title) {
+    let h = 0; for (const c of title) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    const a = h % 360, b = (a + 50) % 360;
+    return `linear-gradient(160deg, hsl(${a} 55% 38%), hsl(${b} 60% 18%))`;
+  }
+
+  let toastTimer = null, toastCancelFn = null;
+  function toast(text, frac, onCancel) {
+    clearTimeout(toastTimer);
+    $('#toast').hidden = false;
+    $('#toastText').textContent = text;
+    $('#toastBarWrap').hidden = frac == null;
+    if (frac != null) $('#toastBar').style.width = Math.round(frac * 100) + '%';
+    toastCancelFn = onCancel || null;
+    $('#toastCancel').hidden = !onCancel;
+  }
+  function toastDone(text, ms = 3500) {
+    toast(text);
+    toastTimer = setTimeout(() => { $('#toast').hidden = true; }, ms);
+  }
+  $('#toastCancel').addEventListener('click', () => { if (toastCancelFn) toastCancelFn(); });
+
+  let wakeLock = null;
+  async function keepAwake(on) {
+    try {
+      if (on && 'wakeLock' in navigator && !wakeLock) {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { wakeLock = null; });
+      } else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+    } catch {}
+  }
+
+  function openSheet(id) { $(id).hidden = false; }
+  function closeSheet(el) { el.hidden = true; }
+  document.querySelectorAll('.sheet').forEach((s) => {
+    s.addEventListener('click', (e) => { if (e.target === s || e.target.hasAttribute('data-close')) closeSheet(s); });
+  });
+
+  // Press-and-hold helper. Short tap runs onTap, holding runs onLong.
+  function attachPress(el, onTap, onLong, ms = 500) {
+    let t = null, sx = 0, sy = 0, fired = false;
+    const cancel = () => { if (t) { clearTimeout(t); t = null; } el.classList.remove('pressing'); };
+    el.addEventListener('pointerdown', (e) => {
+      if (e.button > 0) return;
+      fired = false; sx = e.clientX; sy = e.clientY; el.classList.add('pressing');
+      t = setTimeout(() => { t = null; fired = true; el.classList.remove('pressing'); if (navigator.vibrate) navigator.vibrate(10); onLong && onLong(); }, ms);
+    });
+    el.addEventListener('pointermove', (e) => { if (t && Math.hypot(e.clientX - sx, e.clientY - sy) > 10) cancel(); });
+    el.addEventListener('pointerup', cancel);
+    el.addEventListener('pointercancel', cancel);
+    el.addEventListener('pointerleave', cancel);
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+    el.addEventListener('click', (e) => { if (fired) { e.preventDefault(); fired = false; return; } onTap && onTap(); });
+  }
+
+  // ---------- IndexedDB ----------
+  function openDB() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open('malakai-movies', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('movies', { keyPath: 'id' });
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+  }
+  const store = (mode) => DB.transaction('movies', mode).objectStore('movies');
+  const req = (r) => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  const dbAll = () => req(store('readonly').getAll());
+  const dbPut = (m) => DB ? req(store('readwrite').put(m)).catch((e) => console.warn('save failed', e)) : Promise.resolve();
+  const dbDel = (id) => DB ? req(store('readwrite').delete(id)) : Promise.resolve();
+
+  // ---------- in-app storage (OPFS) via a worker ----------
+  const WORKER_SRC = `
+    let controller = null;
+    async function openTarget(name) {
+      const root = await navigator.storage.getDirectory();
+      const dir = await root.getDirectoryHandle('movies', { create: true });
+      const fh = await dir.getFileHandle(name, { create: true });
+      const h = await fh.createSyncAccessHandle();
+      h.truncate(0);
+      return { dir, h };
+    }
+    function pickName(pref, url, disp, type) {
+      let n = (pref || '').trim();
+      if (!n && disp) {
+        const m = disp.match(/filename\\*=UTF-8''([^;]+)/i) || disp.match(/filename="?([^";]+)"?/i);
+        if (m) { try { n = decodeURIComponent(m[1]); } catch (_) { n = m[1]; } }
+      }
+      if (!n) { try { n = decodeURIComponent(new URL(url).pathname.split('/').pop() || ''); } catch (_) {} }
+      n = (n || 'Movie').replace(/[\\/\\\\:*?"<>|]/g, '_');
+      if (!/\\.(mp4|m4v|mov|mkv|avi|webm)$/i.test(n)) n += (/quicktime/.test(type) ? '.mov' : '.mp4');
+      return n;
+    }
+    self.onmessage = async (e) => {
+      const d = e.data;
+      if (d.kind === 'cancel') { if (controller) controller.abort(); return; }
+      let dir, h, name = d.name;
+      try {
+        if (d.kind === 'copy') {
+          ({ dir, h } = await openTarget(name));
+          const file = d.file, CHUNK = 8 * 1024 * 1024; let off = 0, last = 0;
+          while (off < file.size) {
+            const buf = new Uint8Array(await file.slice(off, off + CHUNK).arrayBuffer());
+            h.write(buf, { at: off }); off += buf.byteLength;
+            const now = Date.now();
+            if (now - last > 400) { last = now; self.postMessage({ type: 'progress', job: d.job, done: off, total: file.size }); }
+          }
+          h.flush(); h.close();
+          self.postMessage({ type: 'done', job: d.job, name, size: file.size });
+        } else if (d.kind === 'download') {
+          controller = new AbortController();
+          const res = await fetch(d.url, { signal: controller.signal });
+          if (!res.ok) throw new Error('The server answered ' + res.status);
+          const type = res.headers.get('content-type') || '';
+          name = pickName(d.name, res.url || d.url, res.headers.get('content-disposition') || '', type);
+          if (/\\.(mkv|avi|webm)$/i.test(name) || /matroska/.test(type)) { controller.abort(); throw new Error('NOT_MP4:' + name); }
+          if (/text\\/html/.test(type)) { controller.abort(); throw new Error('That link opens a web page, not a movie file.'); }
+          const total = +res.headers.get('content-length') || 0;
+          ({ dir, h } = await openTarget(name));
+          const reader = res.body.getReader(); let off = 0, last = 0;
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            h.write(value, { at: off }); off += value.byteLength;
+            const now = Date.now();
+            if (now - last > 400) { last = now; self.postMessage({ type: 'progress', job: d.job, done: off, total, name }); }
+          }
+          h.flush(); h.close();
+          self.postMessage({ type: 'done', job: d.job, name, size: off });
+        }
+      } catch (err) {
+        try { if (h) h.close(); } catch (_) {}
+        try { if (dir && name) await dir.removeEntry(name); } catch (_) {}
+        const aborted = err && err.name === 'AbortError';
+        self.postMessage({ type: 'error', job: d.job, aborted, network: err instanceof TypeError, message: String(err && err.message || err) });
+      } finally { controller = null; }
+    };`;
+  let worker = null, jobSeq = 0;
+  function runJob(msg, onProgress) {
+    return new Promise((res, rej) => {
+      if (!worker) worker = new Worker(URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' })));
+      const job = ++jobSeq;
+      const h = (e) => {
+        const d = e.data; if (d.job !== job) return;
+        if (d.type === 'progress') onProgress && onProgress(d);
+        else {
+          worker.removeEventListener('message', h);
+          if (d.type === 'done') res(d);
+          else { const err = new Error(d.message); err.aborted = d.aborted; err.network = d.network; rej(err); }
+        }
+      };
+      worker.addEventListener('message', h);
+      worker.postMessage({ ...msg, job });
+    });
+  }
+  const cancelJob = () => worker && worker.postMessage({ kind: 'cancel' });
+  const opfsName = (m) => m.id.replace(/[\/\\:*?"<>|]/g, '_') + '.' + ext(m.videoName);
+
+  async function getVideoFile(m) {
+    if (m.stored && opfsDir) {
+      try { return await (await opfsDir.getFileHandle(m.opfsName)).getFile(); }
+      catch { m.stored = false; await dbPut(m); }
+    }
+    return state.session.get(m.id) || null;
+  }
+  async function spaceLeft() {
+    try { const e = await navigator.storage.estimate(); return { usage: e.usage || 0, free: (e.quota || 0) - (e.usage || 0) }; }
+    catch { return null; }
+  }
+
+  // ---------- subtitles, images, frames ----------
+  function srtToVtt(s) {
+    s = s.replace(/^﻿/, '').replace(/\r\n?/g, '\n');
+    s = s.replace(/(\d{1,2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+    return 'WEBVTT\n\n' + s.trim() + '\n';
+  }
+  async function readSubs(f) {
+    const buf = await f.arrayBuffer();
+    let t = new TextDecoder('utf-8').decode(buf);
+    if (t.includes('�')) { try { t = new TextDecoder('windows-1252').decode(buf); } catch {} }
+    return ext(f.name) === 'vtt' ? t : srtToVtt(t);
+  }
+  const loadImg = (url) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+  async function shrinkImage(blob) {
+    const u = URL.createObjectURL(blob);
+    try {
+      const i = await loadImg(u);
+      const s = Math.min(1, 500 / i.naturalWidth);
+      const c = document.createElement('canvas');
+      c.width = Math.round(i.naturalWidth * s); c.height = Math.round(i.naturalHeight * s);
+      c.getContext('2d').drawImage(i, 0, 0, c.width, c.height);
+      return await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.85));
+    } catch { return null; } finally { URL.revokeObjectURL(u); }
+  }
+  function grabFrame(file) {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const v = document.createElement('video');
+      v.muted = true; v.playsInline = true; v.preload = 'auto';
+      v.style.cssText = 'position:fixed;left:-10px;top:-10px;width:2px;height:2px;opacity:0;pointer-events:none';
+      document.body.appendChild(v);
+      const spots = [0.14, 0.3, 0.5]; let i = 0, done = false;
+      const finish = (b) => {
+        if (done) return; done = true; clearTimeout(to);
+        v.pause(); v.removeAttribute('src'); v.load(); v.remove(); URL.revokeObjectURL(url); resolve(b);
+      };
+      const to = setTimeout(() => finish(null), 20000);
+      v.addEventListener('loadedmetadata', () => {
+        const seek = () => { v.pause(); v.currentTime = Math.max(1, v.duration * spots[i]); };
+        const p = v.play(); p && p.then ? p.then(seek, seek) : seek();
+      });
+      v.addEventListener('seeked', () => {
+        try {
+          const w = 480, h = Math.round(w * v.videoHeight / v.videoWidth) || 270;
+          const c = document.createElement('canvas'); c.width = w; c.height = h;
+          const x = c.getContext('2d'); x.drawImage(v, 0, 0, w, h);
+          const d = x.getImageData(0, 0, w, h).data; let sum = 0, n = 0;
+          for (let k = 0; k < d.length; k += 400) { sum += d[k] + d[k + 1] + d[k + 2]; n++; }
+          if (sum / n / 3 < 18 && ++i < spots.length) { v.currentTime = v.duration * spots[i]; return; }
+          c.toBlob((b) => finish(b), 'image/jpeg', 0.8);
+        } catch { finish(null); }
+      });
+      v.addEventListener('error', () => finish(null));
+      v.src = url;
+    });
+  }
+
+  // ---------- TMDB posters ----------
+  const tmdbKey = () => ls.get('tmdbKey', '').trim();
+  async function tmdbSearch(title, year) {
+    const k = tmdbKey(); if (!k) throw new Error('Add your TMDB key in Settings first.');
+    const go = async (withYear) => {
+      const u = new URL('https://api.themoviedb.org/3/search/movie');
+      u.searchParams.set('query', title); u.searchParams.set('include_adult', 'false');
+      if (withYear && year) u.searchParams.set('year', year);
+      const headers = {};
+      if (k.startsWith('eyJ')) headers.Authorization = 'Bearer ' + k; else u.searchParams.set('api_key', k);
+      const r = await fetch(u, { headers });
+      if (r.status === 401) throw new Error('TMDB rejected the key. Check it in Settings.');
+      if (!r.ok) throw new Error('TMDB answered ' + r.status);
+      const j = await r.json();
+      return (j.results || []).filter((x) => x.poster_path);
+    };
+    let res = await go(true);
+    if (!res.length && year) res = await go(false);
+    return res;
+  }
+  async function tmdbPoster(path) {
+    const r = await fetch('https://image.tmdb.org/t/p/w500' + path);
+    if (!r.ok) throw new Error('Poster download failed (' + r.status + ')');
+    return await shrinkImage(await r.blob());
+  }
+  async function autoPoster(m) {
+    if (tmdbKey() && navigator.onLine !== false) {
+      try {
+        const res = await tmdbSearch(m.title, m.year);
+        if (res.length) { const b = await tmdbPoster(res[0].poster_path); if (b) { setPoster(m, b, 'tmdb'); return true; } }
+      } catch (e) { console.warn(e); }
+    }
+    const f = await getVideoFile(m);
+    if (f) { const b = await grabFrame(f); if (b) { setPoster(m, b, 'frame'); return true; } }
+    return false;
+  }
+  function setPoster(m, blob, source) { m.poster = blob; m.posterSource = source; dbPut(m); }
+
+  function posterUrl(m) {
+    if (!m.poster) return null;
+    let u = state.posterUrls.get(m.id);
+    if (!u || u.blob !== m.poster) {
+      if (u) URL.revokeObjectURL(u.url);
+      u = { blob: m.poster, url: URL.createObjectURL(m.poster) };
+      state.posterUrls.set(m.id, u);
+    }
+    return u.url;
+  }
+  function fillPoster(el, m) {
+    el.innerHTML = ''; el.style.background = '';
+    const u = posterUrl(m);
+    if (u) { const img = document.createElement('img'); img.src = u; img.alt = ''; el.appendChild(img); }
+    else {
+      el.style.background = grad(m.title);
+      const t = document.createElement('span'); t.className = 'ph'; t.textContent = m.title; el.appendChild(t);
+    }
+  }
+
+  // ---------- rendering ----------
+  function sorted(list) {
+    const mode = ls.get('sort', 'alpha');
+    const alpha = (a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
+    if (mode === 'recent') return [...list].sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+    if (mode === 'custom') return [...list].sort((a, b) => ((a.order ?? 1e9) - (b.order ?? 1e9)) || (a.addedAt || 0) - (b.addedAt || 0));
+    return [...list].sort(alpha);
+  }
+  function card(m) {
+    const el = document.createElement('div');
+    el.className = 'card' + (playable(m) ? '' : ' missing');
+    el.setAttribute('role', 'button');
+    const p = document.createElement('div'); p.className = 'poster'; fillPoster(p, m);
+    const badges = document.createElement('div'); badges.className = 'badges';
+    const badge = (t, cls) => { const b = document.createElement('span'); b.className = 'badge' + (cls ? ' ' + cls : ''); b.textContent = t; badges.appendChild(b); };
+    if (m.vtt) badge('CC');
+    if (m.stored) badge('Saved');
+    if (m.watched) badge('✓', 'watched');
+    p.appendChild(badges);
+    if (m.duration && m.position > 30 && !m.watched) {
+      const bar = document.createElement('div'); bar.className = 'prog';
+      const fill = document.createElement('div'); fill.style.width = Math.min(100, m.position / m.duration * 100) + '%';
+      bar.appendChild(fill); p.appendChild(bar);
+    }
+    const t = document.createElement('div'); t.className = 'ctitle'; t.textContent = m.title;
+    const y = document.createElement('div'); y.className = 'cyear'; y.textContent = m.year || '';
+    el.append(p, t, y);
+    attachPress(el, () => play(m), () => { if (!locked()) openMenu(m); });
+    return el;
+  }
+
+  function render() {
+    document.body.classList.toggle('locked', locked());
+    document.body.classList.toggle('big', ls.get('big', '0') === '1');
+    $('#lockIcon').hidden = !locked();
+    const sortMode = ls.get('sort', 'alpha');
+    $('#sortSel').value = sortMode;
+    $('#editOrderBtn').hidden = sortMode !== 'custom';
+
+    const q = $('#search').value.trim().toLowerCase();
+    const list = sorted(state.movies).filter((m) => !q || m.title.toLowerCase().includes(q));
+    const cont = state.movies
+      .filter((m) => !m.watched && m.duration && m.position > 30 && m.position < m.duration - 120)
+      .sort((a, b) => b.lastPlayed - a.lastPlayed);
+
+    const grid = $('#grid'); grid.innerHTML = '';
+    list.forEach((m) => grid.appendChild(card(m)));
+    const row = $('#continueRow'); row.innerHTML = '';
+    cont.forEach((m) => row.appendChild(card(m)));
+    $('#continueSec').hidden = !cont.length || !!q;
+    $('#empty').hidden = state.movies.length > 0;
+    $('#allTitle').hidden = state.movies.length === 0;
+
+    const banners = $('#banners'); banners.innerHTML = '';
+    const add = (text, btnText, onBtn) => {
+      const d = document.createElement('div'); d.className = 'banner';
+      const s = document.createElement('span'); s.textContent = text; d.appendChild(s);
+      if (btnText) { const b = document.createElement('button'); b.className = 'btn'; b.textContent = btnText; b.onclick = onBtn; d.appendChild(b); }
+      banners.appendChild(d);
+    };
+    const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+    if (!standalone) add('For offline use: tap Share, then Add to Home Screen, and open Malakai Movies from that icon.');
+    const missing = state.movies.filter((m) => !playable(m)).length;
+    if (missing && !locked()) add(`${missing} movie${missing > 1 ? 's need their files' : ' needs its file'} for this session. Tap + › From Files and select ${missing > 1 ? 'them' : 'it'}.`);
+    const remind = state.movies.filter((m) => m.stored && !m.reminded);
+    if (remind.length && !locked()) {
+      const size = remind.reduce((a, m) => a + (m.size || 0), 0);
+      add(`${remind.length} movie${remind.length > 1 ? 's are' : ' is'} now saved in the app. Delete the original${remind.length > 1 ? 's' : ''} in Files to free ${gb(size)}.`,
+        'Got it', async () => { for (const m of remind) { m.reminded = true; await dbPut(m); } render(); });
+    }
+    updateStorage();
+  }
+  async function updateStorage() {
+    const s = await spaceLeft();
+    const saved = state.movies.filter((m) => m.stored).reduce((a, m) => a + (m.size || 0), 0);
+    const text = `${state.movies.length} movie${state.movies.length === 1 ? '' : 's'}` +
+      (saved ? ` · ${gb(saved)} saved in app` : '') +
+      (s && s.free > 0 ? ` · ${gb(s.free)} available to the app` : '');
+    $('#storage').textContent = text; $('#settingsStorage').textContent = text;
+  }
+
+  // ---------- adding from Files ----------
+  let pending = null;
+  function planImport(files) {
+    const vids = [], subs = [], imgs = [], skipped = [];
+    for (const f of files) {
+      const e = ext(f.name);
+      if (VIDEO_EXT.includes(e)) vids.push(f);
+      else if (SUB_EXT.includes(e)) subs.push(f);
+      else if (IMG_EXT.includes(e)) imgs.push(f);
+      else skipped.push(f.name);
+    }
+    const plan = vids.map((v) => { const id = baseOf(v.name).toLowerCase(); return { id, video: v, existing: byId(id) }; });
+    const ids = new Set([...plan.map((p) => p.id), ...state.movies.map((m) => m.id)]);
+    const target = (f) => {
+      const b = baseOf(f.name).toLowerCase(); let best = null;
+      for (const c of ids) {
+        if (b === c || b.startsWith(c + '.') || b.startsWith(c + ' ') || b.startsWith(c + '-') || b.startsWith(c + '_'))
+          if (!best || c.length > best.length) best = c;
+      }
+      return best;
+    };
+    const extras = new Map(), unmatched = [];
+    const put = (id, key, f) => { if (!extras.has(id)) extras.set(id, {}); extras.get(id)[key] = f; };
+    subs.forEach((f) => { const t = target(f); t ? put(t, 'sub', f) : unmatched.push(f.name); });
+    imgs.forEach((f) => { const t = target(f); t ? put(t, 'img', f) : unmatched.push(f.name); });
+    return { plan, extras, unmatched, skipped };
+  }
+  async function showImportSheet(p) {
+    pending = p;
+    const n = p.plan.filter((x) => !x.existing).length, relink = p.plan.length - n;
+    const subs = [...p.extras.values()].filter((x) => x.sub).length;
+    const imgs = [...p.extras.values()].filter((x) => x.img).length;
+    const lines = [];
+    if (n) lines.push(`${n} new movie${n > 1 ? 's' : ''}`);
+    if (relink) lines.push(`${relink} already in the library (reconnected)`);
+    if (subs) lines.push(`${subs} subtitle file${subs > 1 ? 's' : ''}`);
+    if (imgs) lines.push(`${imgs} poster${imgs > 1 ? 's' : ''}`);
+    const box = $('#importSummary'); box.innerHTML = '';
+    const ul = document.createElement('ul');
+    (lines.length ? lines : ['Nothing usable in that selection.']).forEach((l) => { const li = document.createElement('li'); li.textContent = l; ul.appendChild(li); });
+    box.appendChild(ul);
+    const note = (t) => { const d = document.createElement('p'); d.className = 'small'; d.textContent = t; box.appendChild(d); };
+    if (p.unmatched.length) note('No matching movie for: ' + p.unmatched.join(', ') + '. Name subtitles and posters exactly like the movie file.');
+    if (p.skipped.length) note("Skipped (won't play here): " + p.skipped.join(', ') + '. Convert MKVs to MP4 in a-Shell first.');
+    $('#saveCopies').checked = ls.get('saveCopies', '1') === '1';
+    $('#saveCopies').disabled = !opfsDir;
+    const need = p.plan.filter((x) => !(x.existing && x.existing.stored)).reduce((a, x) => a + x.video.size, 0);
+    const s = await spaceLeft();
+    $('#importSpace').textContent = !opfsDir ? 'Saving inside the app is not available here. Movies will play from your files.'
+      : need ? `Saving copies needs about ${gb(need)}${s ? `; about ${gb(s.free)} is available to the app` : ''}.` : '';
+    $('#importGo').disabled = !lines.length;
+    openSheet('#importSheet');
+  }
+  function newMovie(id, videoName, size) {
+    const { title, year } = parseTitle(baseOf(videoName));
+    const maxOrder = state.movies.reduce((a, m) => Math.max(a, m.order ?? -1), -1);
+    const m = { id, title, year, videoName, size, stored: false, opfsName: '', position: 0, duration: 0,
+      lastPlayed: 0, addedAt: Date.now(), poster: null, posterSource: '', vtt: null, order: maxOrder + 1,
+      watched: false, reminded: false };
+    state.movies.push(m);
+    return m;
+  }
+  async function doImport(p, saveCopies) {
+    for (const x of p.plan) {
+      let m = x.existing || byId(x.id);
+      if (!m) m = newMovie(x.id, x.video.name, x.video.size);
+      if (!m.stored) { m.videoName = x.video.name; m.size = x.video.size; }
+      state.session.set(m.id, x.video);
+      await dbPut(m);
+    }
+    for (const [id, ex] of p.extras) {
+      const m = byId(id); if (!m) continue;
+      if (ex.sub) m.vtt = await readSubs(ex.sub);
+      if (ex.img) { const b = await shrinkImage(ex.img); if (b) { m.poster = b; m.posterSource = 'manual'; } }
+      await dbPut(m);
+    }
+    render();
+    await work(async () => {
+      await fillMissingPosters();
+      if (saveCopies && opfsDir) {
+        const toCopy = p.plan.map((x) => byId(x.id)).filter((m) => m && !m.stored);
+        for (let i = 0; i < toCopy.length; i++) await saveCopy(toCopy[i], `(${i + 1} of ${toCopy.length})`);
+      }
+    });
+  }
+  async function work(fn) {
+    busy = true; keepAwake(true);
+    try { await fn(); toastDone('Library updated.'); }
+    catch (e) { toastDone(e.message || String(e), 6000); }
+    finally { busy = false; keepAwake(false); render(); }
+  }
+  async function fillMissingPosters() {
+    const need = state.movies.filter((m) => !m.poster);
+    for (let i = 0; i < need.length; i++) {
+      toast(`Finding poster for ${need[i].title} (${i + 1} of ${need.length})`);
+      if (await autoPoster(need[i])) render();
+    }
+  }
+  async function saveCopy(m, label = '') {
+    const f = state.session.get(m.id); if (!f) return;
+    const s = await spaceLeft();
+    if (s && s.free && s.free < f.size + 3e8) { toastDone(`Not enough room to save ${m.title} in the app. It will play from your files.`, 6000); await sleep(3000); return; }
+    const name = opfsName(m);
+    try {
+      await runJob({ kind: 'copy', file: f, name },
+        (d) => toast(`Saving ${m.title} ${label}: ${gb(d.done)} of ${gb(d.total)}. Keep this app open.`, d.done / d.total));
+      m.stored = true; m.opfsName = name; m.reminded = false; await dbPut(m); render();
+    } catch (e) { toastDone(`Couldn't save ${m.title} in the app (${e.message}). It will play from your files.`, 6000); await sleep(3000); }
+  }
+
+  // ---------- adding from a link ----------
+  async function downloadLink(url, name) {
+    if (!opfsDir) throw new Error('Downloading into the app is not available here.');
+    let shownName = name || 'movie';
+    const d = await runJob({ kind: 'download', url, name },
+      (p) => { if (p.name) shownName = p.name;
+        toast(`Downloading ${shownName}: ${gb(p.done)}${p.total ? ' of ' + gb(p.total) : ''}. Keep this app open.`, p.total ? p.done / p.total : null, cancelJob); });
+    const id = baseOf(d.name).toLowerCase();
+    let m = byId(id);
+    if (m && m.stored && m.opfsName !== d.name) { try { await opfsDir.removeEntry(m.opfsName); } catch {} }
+    if (!m) m = newMovie(id, d.name, d.size);
+    m.videoName = d.name; m.size = d.size; m.stored = true; m.opfsName = d.name; m.reminded = true;
+    await dbPut(m);
+    render();
+    if (!m.poster) await autoPoster(m);
+    return m;
+  }
+
+  // ---------- long-press menu ----------
+  function openMenu(m) {
+    menuMovie = m;
+    fillPoster($('#menuPoster'), m);
+    $('#menuTitle').textContent = m.title + (m.year ? ` (${m.year})` : '');
+    const info = [m.size ? gb(m.size) : '', m.stored ? 'Saved in app' : playable(m) ? 'Playing from your files' : 'File not loaded', m.vtt ? 'Subtitles' : 'No subtitles'];
+    $('#menuInfo').textContent = info.filter(Boolean).join(' · ');
+    const show = (act, on) => { $(`#menuSheet [data-act="${act}"]`).hidden = !on; };
+    show('play', playable(m));
+    $('#posterMenuSheet [data-act="frame"]').hidden = !playable(m);
+    $('#subsMenuSheet [data-act="subsRemove"]').hidden = !m.vtt;
+    $('#subsMenuSheet [data-act="subs"]').textContent = m.vtt ? '＋  Replace subtitle file' : '＋  Add subtitle file';
+    show('copy', !m.stored && state.session.has(m.id) && !!opfsDir);
+    $('#menuSheet [data-act="watched"]').textContent = m.watched ? '↺  Mark unwatched' : '✓  Mark watched';
+    openSheet('#menuSheet');
+  }
+  ['#posterMenuSheet', '#subsMenuSheet'].forEach((id) => $(id).querySelector('[data-back]').addEventListener('click', () => { closeSheet($(id)); openSheet('#menuSheet'); }));
+  const onMenu = async (e) => {
+    const act = e.target.closest('[data-act]') && e.target.closest('[data-act]').dataset.act; if (!act) return;
+    const m = menuMovie; e.currentTarget.hidden = true;
+    if (act === 'posterMenu') openSheet('#posterMenuSheet');
+    else if (act === 'subsMenu') openSheet('#subsMenuSheet');
+    else if (act === 'play') play(m);
+    else if (act === 'edit') { $('#editTitle').value = m.title; $('#editYear').value = m.year || ''; openSheet('#editSheet'); setTimeout(() => { $('#editTitle').focus(); $('#editTitle').select(); }, 50); }
+    else if (act === 'findPoster') openPosterSearch(m);
+    else if (act === 'poster') $('#posterPicker').click();
+    else if (act === 'frame') {
+      toast('Grabbing a frame…'); const f = await getVideoFile(m); const b = f && await grabFrame(f);
+      if (b) { setPoster(m, b, 'frame'); render(); toastDone('Poster updated.'); } else toastDone("Couldn't grab a frame from this movie.");
+    }
+    else if (act === 'subs') $('#subPicker').click();
+    else if (act === 'subsRemove') { m.vtt = null; await dbPut(m); render(); }
+    else if (act === 'watched') { m.watched = !m.watched; if (!m.watched) m.position = 0; await dbPut(m); render(); }
+    else if (act === 'copy') work(() => saveCopy(m));
+    else if (act === 'delete') {
+      $('#deleteTitle').textContent = `Delete ${m.title}?`;
+      $('#deleteText').textContent = m.stored
+        ? `This removes it from the library and deletes the copy saved in the app (${gb(m.size || 0)}). The original file stays where it is.`
+        : 'This removes it from the library. The original file stays where it is.';
+      openSheet('#deleteSheet');
+    }
+  };
+  ['#menuSheet', '#posterMenuSheet', '#subsMenuSheet'].forEach((id) => $(id).addEventListener('click', onMenu));
+  $('#editSave').addEventListener('click', async () => {
+    const m = menuMovie; const t = $('#editTitle').value.trim();
+    if (t) m.title = t; m.year = $('#editYear').value.trim();
+    await dbPut(m); closeSheet($('#editSheet')); render();
+  });
+  $('#editTitle').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#editSave').click(); });
+  $('#editYear').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#editSave').click(); });
+  $('#deleteGo').addEventListener('click', async () => {
+    const m = menuMovie; closeSheet($('#deleteSheet'));
+    if (m.stored && opfsDir && m.opfsName) { try { await opfsDir.removeEntry(m.opfsName); } catch {} }
+    await dbDel(m.id);
+    state.movies = state.movies.filter((x) => x !== m); state.session.delete(m.id);
+    render(); toastDone(`Deleted ${m.title}.`);
+  });
+  $('#posterPicker').addEventListener('change', async (e) => {
+    const f = e.target.files[0]; e.target.value = ''; const m = menuMovie; if (!f || !m) return;
+    const b = await shrinkImage(f);
+    if (b) { setPoster(m, b, 'manual'); render(); } else toastDone("Couldn't read that image.");
+  });
+  $('#subPicker').addEventListener('change', async (e) => {
+    const f = e.target.files[0]; e.target.value = ''; const m = menuMovie; if (!f || !m) return;
+    m.vtt = await readSubs(f); await dbPut(m); render(); toastDone('Subtitles added.');
+  });
+
+  // ---------- poster search ----------
+  let posterMovie = null;
+  function openPosterSearch(m) {
+    posterMovie = m;
+    $('#posterQuery').value = m.title; $('#posterResults').innerHTML = '';
+    openSheet('#posterSheet'); runPosterSearch();
+  }
+  async function runPosterSearch() {
+    const m = posterMovie, q = $('#posterQuery').value.trim(); if (!q) return;
+    const box = $('#posterResults'); box.innerHTML = ''; $('#posterMsg').textContent = 'Searching…';
+    try {
+      const res = await tmdbSearch(q, q === m.title ? m.year : '');
+      $('#posterMsg').textContent = res.length ? 'Tap the right poster.' : 'No posters found. Try a different spelling.';
+      res.slice(0, 12).forEach((r) => {
+        const b = document.createElement('button');
+        const img = document.createElement('img'); img.src = 'https://image.tmdb.org/t/p/w185' + r.poster_path; img.alt = '';
+        const s = document.createElement('span'); s.textContent = `${r.title}${r.release_date ? ' (' + r.release_date.slice(0, 4) + ')' : ''}`;
+        b.append(img, s);
+        b.onclick = async () => {
+          $('#posterMsg').textContent = 'Saving poster…';
+          try {
+            const blob = await tmdbPoster(r.poster_path);
+            setPoster(m, blob, 'tmdb');
+            if (!m.year && r.release_date) { m.year = r.release_date.slice(0, 4); dbPut(m); }
+            closeSheet($('#posterSheet')); render();
+          } catch (e) { $('#posterMsg').textContent = e.message; }
+        };
+        box.appendChild(b);
+      });
+    } catch (e) { $('#posterMsg').textContent = e.message || 'Search failed. Are you online?'; }
+  }
+  $('#posterSearchGo').addEventListener('click', runPosterSearch);
+  $('#posterQuery').addEventListener('keydown', (e) => { if (e.key === 'Enter') runPosterSearch(); });
+
+  // ---------- custom order ----------
+  function openOrder() {
+    const list = $('#orderList'); list.innerHTML = '';
+    sorted(state.movies).forEach((m) => {
+      const r = document.createElement('div'); r.className = 'orow'; r.dataset.id = m.id;
+      const p = document.createElement('div'); p.className = 'poster'; fillPoster(p, m);
+      const t = document.createElement('span'); t.className = 't'; t.textContent = m.title;
+      const h = document.createElement('div'); h.className = 'handle'; h.textContent = '≡'; h.setAttribute('aria-label', 'Drag');
+      r.append(p, t, h); list.appendChild(r);
+      h.addEventListener('pointerdown', (e) => {
+        e.preventDefault(); r.classList.add('dragging');
+        const move = (ev) => {
+          const rows = [...list.children].filter((x) => x !== r);
+          const after = rows.find((x) => { const b = x.getBoundingClientRect(); return ev.clientY < b.top + b.height / 2; });
+          if (after) { if (after !== r.nextSibling) list.insertBefore(r, after); }
+          else if (list.lastChild !== r) list.appendChild(r);
+          const pb = list.closest('.panel'), pr = pb.getBoundingClientRect();
+          if (ev.clientY < pr.top + 40) pb.scrollTop -= 12; else if (ev.clientY > pr.bottom - 40) pb.scrollTop += 12;
+        };
+        // Listen on window: moving the row in the DOM drops pointer capture on the handle.
+        const up = () => { r.classList.remove('dragging'); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };
+        window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+      });
+    });
+    openSheet('#orderSheet');
+  }
+  $('#orderDone').addEventListener('click', async () => {
+    const ids = [...$('#orderList').children].map((r) => r.dataset.id);
+    for (let i = 0; i < ids.length; i++) { const m = byId(ids[i]); if (m) { m.order = i; await dbPut(m); } }
+    ls.set('sort', 'custom'); closeSheet($('#orderSheet')); render();
+  });
+
+  // ---------- player ----------
+  const video = $('#video');
+  const subsOn = () => ls.get('subs', '1') === '1';
+  function applySubs() {
+    const tt = video.textTracks && video.textTracks[0];
+    if (tt) tt.mode = subsOn() ? 'showing' : 'hidden';
+    $('#subToggle').classList.toggle('on', subsOn());
+  }
+  async function play(m) {
+    const f = await getVideoFile(m);
+    if (!f) {
+      toastDone(locked() ? 'This movie needs to be loaded again by a grown-up.' : `${m.title} needs its file. Tap + › From Files and select it.`, 5000);
+      return;
+    }
+    closePlayer(true);
+    const url = URL.createObjectURL(f);
+    cur = { m, url, trackUrl: null };
+    if (m.vtt) {
+      const tu = URL.createObjectURL(new Blob([m.vtt], { type: 'text/vtt' }));
+      const t = document.createElement('track');
+      t.kind = 'subtitles'; t.label = 'English'; t.srclang = 'en'; t.src = tu;
+      if (subsOn()) t.default = true;
+      video.appendChild(t); cur.trackUrl = tu;
+    }
+    $('#subToggle').hidden = !m.vtt;
+    $('#ptitle').textContent = m.title + (m.year ? ` (${m.year})` : '');
+    $('#player').hidden = false; document.body.classList.add('playing');
+    video.addEventListener('loadedmetadata', () => {
+      if (!cur || cur.m !== m) return;
+      m.duration = video.duration;
+      if (!m.watched && m.position > 30 && m.position < video.duration - 120) video.currentTime = m.position;
+      applySubs();
+    }, { once: true });
+    video.src = url;
+    const p = video.play(); if (p && p.catch) p.catch(() => {});
+    applySubs();
+  }
+  function saveProgress(ended) {
+    if (!cur) return; const m = cur.m;
+    if (ended) { m.position = 0; m.watched = true; }
+    else if (video.currentTime > 0) { m.position = video.currentTime; if (m.watched && video.currentTime > 60) m.watched = false; }
+    if (video.duration) m.duration = video.duration;
+    m.lastPlayed = Date.now();
+    dbPut(m);
+  }
+  function closePlayer(silent) {
+    if (cur) {
+      if (!video.ended) saveProgress(false);
+      video.pause(); video.removeAttribute('src');
+      video.querySelectorAll('track').forEach((t) => t.remove());
+      video.load();
+      URL.revokeObjectURL(cur.url); if (cur.trackUrl) URL.revokeObjectURL(cur.trackUrl);
+      cur = null;
+    }
+    if (!silent) { $('#player').hidden = true; document.body.classList.remove('playing'); render(); }
+  }
+  video.addEventListener('timeupdate', () => { const n = Date.now(); if (n - lastSave > 5000) { lastSave = n; saveProgress(false); } });
+  video.addEventListener('pause', () => { if (!video.ended) saveProgress(false); });
+  video.addEventListener('ended', () => saveProgress(true));
+  document.addEventListener('visibilitychange', () => { if (document.hidden && cur && !video.ended) saveProgress(false); });
+  $('#closePlayer').addEventListener('click', () => closePlayer(false));
+  $('#subToggle').addEventListener('click', () => { ls.set('subs', subsOn() ? '0' : '1'); applySubs(); });
+
+  // ---------- header wiring ----------
+  $('#search').addEventListener('input', render);
+  $('#sortSel').addEventListener('change', (e) => { ls.set('sort', e.target.value); render(); });
+  $('#editOrderBtn').addEventListener('click', openOrder);
+  $('#addBtn').addEventListener('click', () => {
+    if (busy) { toastDone('Still working on the last batch. Keep the app open.'); return; }
+    openSheet('#addSheet');
+  });
+  $('#addFiles').addEventListener('click', () => { closeSheet($('#addSheet')); $('#picker').click(); });
+  $('#addLink').addEventListener('click', () => {
+    closeSheet($('#addSheet')); $('#linkUrl').value = ''; $('#linkName').value = ''; $('#linkFail').hidden = true;
+    openSheet('#linkSheet'); setTimeout(() => $('#linkUrl').focus(), 50);
+  });
+  $('#linkGo').addEventListener('click', async () => {
+    const url = $('#linkUrl').value.trim(), name = $('#linkName').value.trim();
+    if (!/^https?:\/\//i.test(url)) { $('#linkFail').hidden = false; $('#linkFailText').textContent = 'That doesn\'t look like a web link.'; $('#linkSafari').hidden = true; return; }
+    $('#linkSafari').href = url; $('#linkSafari').hidden = false;
+    closeSheet($('#linkSheet'));
+    busy = true; keepAwake(true);
+    try {
+      const m = await downloadLink(url, name);
+      toastDone(`${m.title} is ready.`);
+    } catch (e) {
+      $('#toast').hidden = true;
+      if (e.aborted) { toastDone('Download stopped.'); }
+      else {
+        let msg = e.message || String(e);
+        if (msg.startsWith('NOT_MP4:')) msg = `That file (${msg.slice(8)}) is not an MP4, so it won't play here. Download it in Safari and convert it in a-Shell first.`;
+        else if (e.network) msg = "This site won't let the app download directly. Open the link in Safari instead.";
+        $('#linkFail').hidden = false; $('#linkFailText').textContent = msg;
+        openSheet('#linkSheet');
+      }
+    } finally { busy = false; keepAwake(false); render(); }
+  });
+  $('#picker').addEventListener('change', async (e) => {
+    const files = [...e.target.files]; e.target.value = '';
+    if (files.length) await showImportSheet(planImport(files));
+  });
+  $('#importGo').addEventListener('click', () => {
+    const save = $('#saveCopies').checked && !!opfsDir;
+    ls.set('saveCopies', $('#saveCopies').checked ? '1' : '0');
+    closeSheet($('#importSheet'));
+    const p = pending; pending = null;
+    if (p) doImport(p, save);
+  });
+
+  // settings
+  $('#settingsBtn').addEventListener('click', () => {
+    $('#bigMode').checked = ls.get('big', '0') === '1';
+    $('#tmdbKey').value = tmdbKey();
+    updateStorage(); openSheet('#settingsSheet');
+  });
+  $('#bigMode').addEventListener('change', (e) => { ls.set('big', e.target.checked ? '1' : '0'); render(); });
+  $('#tmdbKey').addEventListener('change', (e) => ls.set('tmdbKey', e.target.value.trim()));
+  $('#allPosters').addEventListener('click', async () => {
+    ls.set('tmdbKey', $('#tmdbKey').value.trim());
+    if (!tmdbKey()) { toastDone('Paste your TMDB key first.'); return; }
+    closeSheet($('#settingsSheet'));
+    const list = state.movies.filter((m) => m.posterSource !== 'manual' && m.posterSource !== 'tmdb');
+    if (!list.length) { toastDone('Every movie already has a real poster.'); return; }
+    await work(async () => {
+      let found = 0;
+      for (let i = 0; i < list.length; i++) {
+        const m = list[i]; toast(`Finding poster for ${m.title} (${i + 1} of ${list.length})`);
+        try { const res = await tmdbSearch(m.title, m.year); if (res.length) { const b = await tmdbPoster(res[0].poster_path); if (b) { setPoster(m, b, 'tmdb'); found++; render(); } } }
+        catch (e) { if (/key/i.test(e.message)) throw e; }
+      }
+      toastDone(`Found ${found} of ${list.length} posters. Fix any wrong ones with press and hold › Find poster online.`, 6000);
+      await sleep(5500);
+    });
+  });
+  $('#lockNow').addEventListener('click', () => { ls.set('locked', '1'); closeSheet($('#settingsSheet')); render(); toastDone('Kid lock on. Hold the title for 3 seconds to unlock.'); });
+  attachPress($('#appTitle'), null, () => {
+    const on = !locked(); ls.set('locked', on ? '1' : '0'); render();
+    toastDone(on ? 'Kid lock on.' : 'Kid lock off.');
+  }, 3000);
+
+  // ---------- start ----------
+  async function init() {
+    try { DB = await openDB(); state.movies = await dbAll(); }
+    catch { toastDone('Storage is unavailable here, so the library will not be saved.', 8000); }
+    try { opfsDir = await (await navigator.storage.getDirectory()).getDirectoryHandle('movies', { create: true }); } catch { opfsDir = null; }
+    for (const m of state.movies) {
+      if (m.stored && opfsDir) { try { await opfsDir.getFileHandle(m.opfsName); } catch { m.stored = false; await dbPut(m); } }
+      else if (!opfsDir) m.stored = false;
+    }
+    try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); } catch {}
+    render();
+    if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+  init();
+})();
+</script>
+</body>
+</html>
