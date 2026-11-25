@@ -375,6 +375,7 @@
       <button data-act="edit">Rename</button>
       <button data-act="posterMenu"><span>Poster</span><span>›</span></button>
       <button data-act="subsMenu"><span>Subtitles</span><span>›</span></button>
+      <button data-act="hideCont">Remove from Continue Watching</button>
       <button data-act="watched">Mark watched</button>
       <button data-act="copy">Save copy in app</button>
       <button data-act="export">Save to Files</button>
@@ -828,6 +829,11 @@
     if (mode === 'custom') return [...list].sort((a, b) => ((a.order ?? 1e9) - (b.order ?? 1e9)) || (a.addedAt || 0) - (b.addedAt || 0));
     return [...list].sort(alpha);
   }
+  // A movie sits in Continue Watching while it's partway through. Removing it hides it
+  // (keeping its resume spot) until the next time it's played.
+  function inContinue(m) {
+    return !m.watched && m.duration && m.position > 30 && m.position < m.duration - 120 && m.contHidden !== m.lastPlayed;
+  }
   function card(m) {
     const el = document.createElement('div');
     el.className = 'card' + (playable(m) ? '' : ' missing');
@@ -870,7 +876,7 @@
     const q = $('#search').value.trim().toLowerCase();
     const list = sorted(state.movies).filter((m) => !q || m.title.toLowerCase().includes(q));
     const cont = state.movies
-      .filter((m) => !m.watched && m.duration && m.position > 30 && m.position < m.duration - 120)
+      .filter(inContinue)
       .sort((a, b) => b.lastPlayed - a.lastPlayed);
 
     const grid = $('#grid'); grid.innerHTML = '';
@@ -1046,6 +1052,7 @@
     $('#menuInfo').textContent = info.filter(Boolean).join(' · ');
     const show = (act, on) => { $(`#menuSheet [data-act="${act}"]`).hidden = !on; };
     show('play', playable(m));
+    show('hideCont', !!inContinue(m));
     $('#posterMenuSheet [data-act="frame"]').hidden = !playable(m);
     $('#subsMenuSheet [data-act="subsRemove"]').hidden = !m.vtt;
     $('#subsMenuSheet [data-act="subs"]').textContent = m.vtt ? 'Replace subtitle file' : 'Add subtitle file';
@@ -1073,6 +1080,7 @@
     }
     else if (act === 'subs') $('#subPicker').click();
     else if (act === 'subsRemove') { m.vtt = null; await dbPut(m); render(); }
+    else if (act === 'hideCont') { m.contHidden = m.lastPlayed; await dbPut(m); render(); toastDone(`Removed ${m.title} from Continue Watching.`); }
     else if (act === 'watched') { m.watched = !m.watched; if (!m.watched) m.position = 0; await dbPut(m); render(); }
     else if (act === 'copy') work(() => saveCopy(m));
     else if (act === 'export') exportMovie(m);
@@ -1228,8 +1236,10 @@
       return;
     }
     closePlayer(true);
-    const url = URL.createObjectURL(f);
-    cur = { m, url, trackUrl: null };
+    // Saved movies stream through the service worker when it's in control; otherwise fall back to a blob URL.
+    const viaSw = !!(m.stored && m.opfsName && navigator.serviceWorker && navigator.serviceWorker.controller);
+    const url = viaSw ? `__media/${encodeURIComponent(m.opfsName)}` : URL.createObjectURL(f);
+    cur = { m, url, file: f, viaSw, trackUrl: null, lastGood: 0, tries: 0, target: null };
     if (m.vtt) {
       const tu = URL.createObjectURL(new Blob([m.vtt], { type: 'text/vtt' }));
       const t = document.createElement('track');
@@ -1247,7 +1257,7 @@
     video.addEventListener('loadedmetadata', () => {
       if (!cur || cur.m !== m) return;
       m.duration = video.duration;
-      if (!m.watched && m.position > 30 && m.position < video.duration - 120) video.currentTime = m.position;
+      if (!m.watched && m.position > 30 && m.position < video.duration - 120) { cur.lastGood = Math.max(0, m.position - 5); video.currentTime = m.position; }
       applySubs();
     }, { once: true });
     video.src = url;
@@ -1256,8 +1266,10 @@
   }
   function saveProgress(ended) {
     if (!cur) return; const m = cur.m;
+    // Only remember a spot that actually played, so a failed seek can't become the resume point.
+    const t = (!video.seeking && video.readyState >= 3) ? video.currentTime : cur.lastGood;
     if (ended) { m.position = 0; m.watched = true; }
-    else if (video.currentTime > 0) { m.position = video.currentTime; if (m.watched && video.currentTime > 60) m.watched = false; }
+    else if (t > 0) { m.position = t; if (m.watched && t > 60) m.watched = false; }
     if (video.duration) m.duration = video.duration;
     m.lastPlayed = Date.now();
     dbPut(m);
@@ -1269,7 +1281,10 @@
       video.pause(); video.removeAttribute('src');
       video.querySelectorAll('track').forEach((t) => t.remove());
       video.load();
-      URL.revokeObjectURL(cur.url); if (cur.trackUrl) URL.revokeObjectURL(cur.trackUrl);
+      clearTimeout(stallTimer);
+      if (cur.url.startsWith('blob:')) URL.revokeObjectURL(cur.url);
+      if (cur.fallbackUrl) URL.revokeObjectURL(cur.fallbackUrl);
+      if (cur.trackUrl) URL.revokeObjectURL(cur.trackUrl);
       cur = null;
     }
     if (!silent) {
@@ -1302,9 +1317,66 @@
   video.addEventListener('timeupdate', syncUI);
   $('#playPause').addEventListener('click', () => { if (video.paused) video.play().catch(() => {}); else video.pause(); });
   seek.addEventListener('input', () => { dragging = true; paintSeek(seek.value / 1000); syncUI(); showControls(); });
-  seek.addEventListener('change', () => {
+  function commitSeek() {
+    if (!dragging) return;
+    dragging = false;
     if (video.duration) video.currentTime = seek.value / 1000 * video.duration;
-    dragging = false; showControls();
+    showControls();
+  }
+  seek.addEventListener('change', commitSeek);
+  ['pointerup', 'touchend', 'touchcancel'].forEach((ev) => seek.addEventListener(ev, () => setTimeout(commitSeek, 0)));
+
+  // ---------- stall recovery ----------
+  // If the picture hasn't come back 6 seconds after a seek or a buffering pause, reload the source at that spot.
+  // Second try backs up a few seconds; after that it returns to the last spot that played.
+  let stallTimer = null;
+  function armStallWatch() {
+    clearTimeout(stallTimer);
+    if (!cur) return;
+    stallTimer = setTimeout(recoverStall, 6000);
+  }
+  function clearStall() { clearTimeout(stallTimer); if (cur) cur.tries = 0; }
+  function useSource(url, at, resume) {
+    const tracks = Array.from(video.querySelectorAll('track'));
+    video.addEventListener('loadedmetadata', () => {
+      try { video.currentTime = Math.max(0, Math.min(at, (video.duration || at) - 1)); } catch {}
+      applySubs();
+      if (resume) video.play().catch(() => {});
+    }, { once: true });
+    video.src = url;
+    tracks.forEach((t) => { if (!t.isConnected) video.appendChild(t); });
+    video.load();
+  }
+  function recoverStall() {
+    if (!cur || video.readyState >= 3) return;
+    const target = cur.target != null ? cur.target : video.currentTime;
+    const resume = true;
+    cur.tries++;
+    if (cur.tries === 1) { useSource(cur.url, target, resume); armStallWatch(); return; }
+    if (cur.tries === 2) {
+      // Fall back from the service worker stream to a direct file URL, or back up a little.
+      if (cur.viaSw && cur.file) { if (!cur.fallbackUrl) cur.fallbackUrl = URL.createObjectURL(cur.file); cur.url = cur.fallbackUrl; cur.viaSw = false; }
+      useSource(cur.url, Math.max(0, target - 3), resume); armStallWatch(); return;
+    }
+    toastDone("Couldn't play from that spot, so it went back to where it last played.", 5000);
+    cur.target = null;
+    useSource(cur.url, cur.lastGood, resume);
+  }
+  video.addEventListener('seeking', () => { if (cur) { cur.target = video.currentTime; armStallWatch(); } });
+  video.addEventListener('waiting', () => { if (cur) { if (cur.target == null) cur.target = video.currentTime; armStallWatch(); } });
+  video.addEventListener('playing', () => { clearStall(); if (cur) cur.target = null; });
+  video.addEventListener('canplay', () => { if (video.paused) clearStall(); });
+  video.addEventListener('timeupdate', () => {
+    if (cur && !video.seeking && video.readyState >= 3 && !video.paused) { cur.lastGood = video.currentTime; }
+  });
+  video.addEventListener('error', () => {
+    // A failed service-worker stream falls back to the direct file once.
+    if (cur && cur.viaSw && cur.file) {
+      const at = cur.target != null ? cur.target : (video.currentTime || cur.lastGood || cur.m.position || 0);
+      if (!cur.fallbackUrl) cur.fallbackUrl = URL.createObjectURL(cur.file);
+      cur.url = cur.fallbackUrl; cur.viaSw = false;
+      useSource(cur.url, at, true);
+    }
   });
   function skip(sec, side) {
     if (!video.duration) return;
@@ -1518,7 +1590,7 @@
     }
     try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); } catch {}
     render();
-    if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => {});
   }
   init();
 })();
