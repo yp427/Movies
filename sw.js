@@ -1,5 +1,5 @@
 // Keeps the app itself available offline. Movies are stored separately by the page.
-const CACHE = 'malakai-movies-v7';
+const CACHE = 'malakai-movies-v8';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png', './title-font.ttf'];
 
 self.addEventListener('install', (e) => {

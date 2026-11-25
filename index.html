@@ -146,7 +146,7 @@
     transition: opacity .25s; z-index: 2; }
   .ptop { top: 0; padding: calc(12px + env(safe-area-inset-top)) 18px 30px; background: linear-gradient(rgba(0,0,0,.75), transparent); }
   .pbottom { bottom: 0; padding: 30px 18px calc(16px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, rgba(0,0,0,.8)); }
-  #player.hidectl .ptop, #player.hidectl .pbottom { opacity: 0; pointer-events: none; }
+  #player.hidectl .ptop, #player.hidectl .pbottom, #player.hidectl #ccPanel { opacity: 0; pointer-events: none; }
   #ptitle { flex: 1; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pbtn.cc { font-weight: 800; font-size: 15px; letter-spacing: .5px; border: 2px solid rgba(255,255,255,.55); background: transparent; }
   .pbtn.cc.on { background: #fff; color: #000; border-color: #fff; }
@@ -162,6 +162,23 @@
   #seek::-moz-range-track { height: 8px; border-radius: 4px; background: rgba(255,255,255,.3); }
   #seek::-moz-range-progress { height: 8px; border-radius: 4px; background: var(--accent); }
   #seek::-moz-range-thumb { width: 32px; height: 32px; border-radius: 50%; background: #fff; border: 0; }
+  #ccPanel { position: absolute; top: calc(78px + env(safe-area-inset-top)); right: 16px; z-index: 3; width: min(560px, calc(100% - 32px));
+    background: rgba(28,30,38,.96); border-radius: 18px; padding: 16px 18px; box-shadow: 0 12px 40px rgba(0,0,0,.6);
+    display: flex; flex-direction: column; gap: 14px; }
+  .ccrow { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .ccrow > span { font-weight: 600; color: #cfd3da; }
+  .ccrow.stack { flex-direction: column; align-items: stretch; gap: 10px; }
+  .pseg.grid4 { display: grid; grid-template-columns: repeat(4, 1fr); }
+  .pseg.grid4 button { justify-content: center; padding: 0 8px; font-size: 14px; white-space: nowrap; }
+  .pseg { display: inline-flex; background: rgba(255,255,255,.08); border-radius: 12px; padding: 3px; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
+  .pseg button { background: transparent; color: #cfd3da; min-width: 52px; height: 44px; padding: 0 14px; border-radius: 9px; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 8px; }
+  .pseg button.on { background: #fff; color: #000; }
+  .sw { font-style: normal; font-weight: 700; font-size: 14px; padding: 1px 5px; border-radius: 4px; color: #fff; }
+  .sw.classic { background: #000; }
+  .sw.seethrough { background: rgba(0,0,0,.45); }
+  .sw.outline { text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; background: #777; }
+  .sw.yellow { color: #ffe14d; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; background: #777; }
   .seekflash { position: absolute; top: 50%; transform: translateY(-50%); width: 120px; height: 120px; border-radius: 60px;
     background: rgba(255,255,255,.18); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px;
     opacity: 0; transition: opacity .35s; pointer-events: none; z-index: 1; }
@@ -176,7 +193,7 @@
   #toast .bar { height: 5px; background: #3a4050; border-radius: 3px; margin-top: 8px; overflow: hidden; }
   #toastBar { height: 100%; width: 0; background: var(--accent); }
   @media (max-width: 640px) { #search { width: 130px; } h1 img { width: 56px; height: 56px; } h1 .ttl { font-size: 34px; } }
-  #video::cue { background: rgba(0,0,0,.6); color: #fff; }
+
 </style>
 <style id="cueStyle"></style>
 </head>
@@ -349,15 +366,6 @@
   <div class="panel">
     <h3>Settings</h3>
     <label class="check"><input type="checkbox" id="bigMode"><span>Big posters<br><span class="small">Larger, simpler cards that are easy for kids to tap.</span></span></label>
-    <div class="field"><span>Subtitle size</span>
-      <div class="seg" id="subSizeSeg">
-        <button data-size="s" style="width:auto;padding:0 14px">Small</button>
-        <button data-size="m" style="width:auto;padding:0 14px">Medium</button>
-        <button data-size="l" style="width:auto;padding:0 14px">Large</button>
-        <button data-size="xl" style="width:auto;padding:0 14px">Extra large</button>
-      </div>
-    </div>
-    
     <label class="field"><span>TMDB key for real posters</span><input id="tmdbKey" autocapitalize="off" autocorrect="off" placeholder="API key or read access token"></label>
     <p class="small">Free at themoviedb.org: make an account, then Settings › API. The key stays on this iPad only.</p>
     <div class="btns">
@@ -388,6 +396,19 @@
     <button class="pbtn" id="closePlayer" aria-label="Close"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     <span id="ptitle"></span>
     <button class="pbtn cc" id="subToggle" aria-label="Subtitles">CC</button>
+  </div>
+  <div id="ccPanel" hidden>
+    <div class="ccrow"><span>Subtitles</span>
+      <div class="pseg" id="ccOnSeg"><button data-on="0">Off</button><button data-on="1">On</button></div></div>
+    <div class="ccrow"><span>Size</span>
+      <div class="pseg" id="ccSizeSeg"><button data-size="s">S</button><button data-size="m">M</button><button data-size="l">L</button><button data-size="xl">XL</button></div></div>
+    <div class="ccrow stack"><span>Style</span>
+      <div class="pseg grid4" id="ccStyleSeg">
+        <button data-style="classic"><i class="sw classic">Aa</i>Classic</button>
+        <button data-style="seethrough"><i class="sw seethrough">Aa</i>Shaded</button>
+        <button data-style="outline"><i class="sw outline">Aa</i>Outline</button>
+        <button data-style="yellow"><i class="sw yellow">Aa</i>Yellow</button>
+      </div></div>
   </div>
   <div class="pbottom">
     <button class="pbtn" id="playPause" aria-label="Play or pause"></button>
@@ -1140,6 +1161,7 @@
     $('#subToggle').hidden = !m.vtt;
     $('#ptitle').textContent = m.title + (m.year ? ` (${m.year})` : '');
     $('#player').hidden = false; document.body.classList.add('playing');
+    $('#ccPanel').hidden = true;
     seek.value = 0; paintSeek(0); $('#tCur').textContent = '0:00'; $('#tDur').textContent = '0:00'; showControls();
     video.addEventListener('loadedmetadata', () => {
       if (!cur || cur.m !== m) return;
@@ -1192,7 +1214,7 @@
   }
   function showControls() {
     player.classList.remove('hidectl'); clearTimeout(hideTimer);
-    if (!video.paused) hideTimer = setTimeout(() => { if (!dragging) player.classList.add('hidectl'); }, 3500);
+    if (!video.paused) hideTimer = setTimeout(() => { if (!dragging && $('#ccPanel').hidden) player.classList.add('hidectl'); }, 3500);
   }
   ['play', 'pause', 'loadedmetadata', 'durationchange', 'seeked'].forEach((ev) => video.addEventListener(ev, () => { syncUI(); showControls(); }));
   video.addEventListener('timeupdate', syncUI);
@@ -1213,6 +1235,7 @@
   // Single tap shows/hides controls. Double tap on the left or right third skips 15 seconds.
   let lastTap = 0, lastSide = '', tapTimer = null;
   $('#tapLayer').addEventListener('pointerup', (e) => {
+    if (!$('#ccPanel').hidden) { $('#ccPanel').hidden = true; showControls(); return; }
     const w = player.clientWidth, x = e.clientX;
     const side = x < w * 0.35 ? 'left' : x > w * 0.65 ? 'right' : 'mid';
     const now = Date.now();
@@ -1249,17 +1272,30 @@
   video.addEventListener('ended', () => saveProgress(true));
   document.addEventListener('visibilitychange', () => { if (document.hidden && cur && !video.ended) saveProgress(false); });
   $('#closePlayer').addEventListener('click', () => closePlayer(false));
-  $('#subToggle').addEventListener('click', () => { ls.set('subs', subsOn() ? '0' : '1'); applySubs(); });
+  $('#subToggle').addEventListener('click', (e) => { e.stopPropagation(); const p = $('#ccPanel'); p.hidden = !p.hidden; syncCcPanel(); showControls(); });
+  $('#ccOnSeg').addEventListener('click', (e) => { const b = e.target.closest('[data-on]'); if (b) { ls.set('subs', b.dataset.on); applySubs(); syncCcPanel(); } });
+  $('#ccSizeSeg').addEventListener('click', (e) => { const b = e.target.closest('[data-size]'); if (b) { ls.set('subSize', b.dataset.size); if (!subsOn()) { ls.set('subs', '1'); applySubs(); } applyCueSize(); syncCcPanel(); } });
+  $('#ccStyleSeg').addEventListener('click', (e) => { const b = e.target.closest('[data-style]'); if (b) { ls.set('subStyle', b.dataset.style); if (!subsOn()) { ls.set('subs', '1'); applySubs(); } applyCueSize(); syncCcPanel(); } });
+  function syncCcPanel() {
+    document.querySelectorAll('#ccOnSeg button').forEach((b) => b.classList.toggle('on', b.dataset.on === (subsOn() ? '1' : '0')));
+    document.querySelectorAll('#ccSizeSeg button').forEach((b) => b.classList.toggle('on', b.dataset.size === ls.get('subSize', 'm')));
+    document.querySelectorAll('#ccStyleSeg button').forEach((b) => b.classList.toggle('on', b.dataset.style === ls.get('subStyle', 'seethrough')));
+  }
 
   // ---------- view + subtitle size ----------
   const CUE = { s: '0.8em', m: '1.05em', l: '1.4em', xl: '1.8em' };
+  const OUTLINE = 'text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000, 0 2px 6px #000;';
+  const STYLES = {
+    classic: 'color: #fff; background-color: #000;',
+    seethrough: 'color: #fff; background-color: rgba(0,0,0,.5);',
+    outline: 'color: #fff; background-color: transparent; ' + OUTLINE,
+    yellow: 'color: #ffe14d; background-color: transparent; ' + OUTLINE
+  };
   function applyCueSize() {
-    const k = ls.get('subSize', 'm');
-    $('#cueStyle').textContent = `#video::cue { font-size: ${CUE[k] || CUE.m}; }`;
-    document.querySelectorAll('#subSizeSeg button').forEach((b) => b.classList.toggle('on', b.dataset.size === k));
+    const k = ls.get('subSize', 'm'), st = ls.get('subStyle', 'seethrough');
+    $('#cueStyle').textContent = `#video::cue { font-size: ${CUE[k] || CUE.m}; ${STYLES[st] || STYLES.seethrough} }`;
   }
   $('#viewSeg').addEventListener('click', (e) => { const b = e.target.closest('[data-view]'); if (b) { ls.set('view', b.dataset.view); render(); } });
-  $('#subSizeSeg').addEventListener('click', (e) => { const b = e.target.closest('[data-size]'); if (b) { ls.set('subSize', b.dataset.size); applyCueSize(); } });
 
   // ---------- header wiring ----------
   $('#search').addEventListener('input', render);
