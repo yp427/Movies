@@ -281,6 +281,7 @@
       <button data-act="subsMenu"><span>Subtitles</span><span>›</span></button>
       <button data-act="watched">Mark watched</button>
       <button data-act="copy">Save copy in app</button>
+      <button data-act="export">Save to Files</button>
       <button data-act="delete" class="danger">Delete</button>
     </div>
     <div class="btns"><button class="btn" data-close>Close</button></div>
@@ -947,6 +948,10 @@
     $('#subsMenuSheet [data-act="subsRemove"]').hidden = !m.vtt;
     $('#subsMenuSheet [data-act="subs"]').textContent = m.vtt ? 'Replace subtitle file' : 'Add subtitle file';
     show('copy', !m.stored && state.session.has(m.id) && !!opfsDir);
+    show('export', !!m.stored);
+    // Load the file now so the share sheet can open straight from the tap (iPadOS requires that).
+    exportFiles = null;
+    if (m.stored) prepareExport(m).then((fs) => { if (menuMovie === m) exportFiles = fs; });
     $('#menuSheet [data-act="watched"]').textContent = m.watched ? 'Mark unwatched' : 'Mark watched';
     openSheet('#menuSheet');
   }
@@ -968,6 +973,7 @@
     else if (act === 'subsRemove') { m.vtt = null; await dbPut(m); render(); }
     else if (act === 'watched') { m.watched = !m.watched; if (!m.watched) m.position = 0; await dbPut(m); render(); }
     else if (act === 'copy') work(() => saveCopy(m));
+    else if (act === 'export') exportMovie(m);
     else if (act === 'delete') {
       $('#deleteTitle').textContent = `Delete ${m.title}?`;
       $('#deleteText').textContent = m.stored
@@ -1000,6 +1006,43 @@
     const f = e.target.files[0]; e.target.value = ''; const m = menuMovie; if (!f || !m) return;
     m.vtt = await readSubs(f); await dbPut(m); render(); toastDone('Subtitles added.');
   });
+
+  // ---------- save a movie back out to Files ----------
+  let exportFiles = null;
+  function vttToSrt(v) {
+    const blocks = v.replace(/\r/g, '').replace(/^WEBVTT[^\n]*\n+/, '').split(/\n{2,}/);
+    let n = 0; const out = [];
+    for (const b of blocks) {
+      const lines = b.split('\n'); const i = lines.findIndex((l) => l.includes('-->'));
+      if (i < 0) continue;
+      const time = lines[i].replace(/(\d{2}:\d{2}:\d{2})\.(\d{3})/g, '$1,$2').replace(/(^|\s)(\d{2}:\d{2})\.(\d{3})/g, '$100:$2,$3').split(/\s+(?=line|position|align|size)/)[0];
+      out.push(String(++n), time, ...lines.slice(i + 1), '');
+    }
+    return out.join('\n');
+  }
+  async function prepareExport(m) {
+    const f = await getVideoFile(m); if (!f) return null;
+    const name = m.videoName || (m.title + '.mp4');
+    const files = [new File([f], name, { type: f.type || 'video/mp4' })];
+    if (m.vtt) files.push(new File([vttToSrt(m.vtt)], baseOf(name) + '.srt', { type: 'text/plain' }));
+    return files;
+  }
+  async function exportMovie(m) {
+    const files = exportFiles || await prepareExport(m);
+    if (!files) { toastDone("Couldn't find this movie's saved copy."); return; }
+    if (navigator.canShare && navigator.share) {
+      try {
+        if (navigator.canShare({ files })) { await navigator.share({ files }); toastDone('Pick "Save to Files" in the share sheet, then choose a folder.', 6000); return; }
+      } catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    // Fallback: a normal download, which Safari saves to your Downloads folder.
+    for (const f of files) {
+      const u = URL.createObjectURL(f); const a = document.createElement('a');
+      a.href = u; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(u), 120000);
+    }
+    toastDone('Downloading to your Files downloads folder.', 6000);
+  }
 
   // ---------- poster search ----------
   let posterMovie = null;
